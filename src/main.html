@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta charset="utf-8" http-equiv="encoding">
+    <title>Sclab_Lifelog_demo</title>
+
+    <script src="../dist/moment.min.js"></script>
+    <script src="../dist/jquery.min.js"></script>
+    <script src="../dist/jquery.daterangepicker.min.js"></script>
+    <script src="../dist/jquery.csv.js"></script>
+    <script src="../dist/vis.js"></script>
+    <script src="elements/Node.js"></script>
+    <script src="elements/Relation.js"></script>
+    <script src="network/SNmanager.js"></script>
+    <script src="util/Util.js"></script>
+    <script src="UserInterface/Timeline.js"></script>
+
+    <link href="../dist/daterangepicker.min.css" rel="stylesheet" type="text/css"/>
+    <link href="../dist/vis.css" rel="stylesheet" type="text/css"/>
+    <link href="../dist/vis-timeline-graph2d.min.css" rel="stylesheet" type="text/css"/>
+    <link href="../dist/materialize.css" rel="stylesheet" type="text/css"/>
+    <link href="main.css" rel="stylesheet" type="text/css"/>
+
+    <script type="text/javascript">
+        // 이 안에서 vis 라이브러리를 사용해 코딩하면됨
+        var manager = null;
+        var timeline = new Timeline();
+
+        var network = null;
+        var nodes = null;
+        var edges = null;
+        let tempNodes = [];
+        let tempEdges = [];
+
+        //시각화 초기값
+        $(document).ready(() => {
+            draw_network();
+            draw_timeline();
+            $('#date').dateRangePicker();
+        });
+
+        //fuction1: 타임라인 시각화 함수
+        function draw_timeline() {
+            var timeline_container = document.getElementById('timeline_visualization');
+            if (manager == null) {
+                timeline.init(null);
+            }
+            else {
+                timeline.init(manager.gss);
+            }
+            timeline.draw(timeline_container);
+        }
+
+        //fuction2: 네트워크 시각화 함수
+        function draw_network() {
+            if (network != null) {
+                network.destroy();
+                network = null;
+            }
+            var container = document.getElementById("networkViewer");
+            //네트워크 초기에 'loading' 보여줌
+            if (nodes == null && edges == null) {
+                var data = {
+                    nodes: [{
+                        id: 0,
+                        title: "ChooseData",
+                        label: "Please Load Data"
+                    }], edges: []
+                };
+                network = new vis.Network(container, data, {});
+                return;
+            }
+            //네트워크 시각화 옵션(크기, 색상)
+				var options = {
+                "edges": {
+                    "smooth": false
+                },
+                "physics": {
+                    "barnesHut": {
+                        "gravitationalConstant": -50000,
+                        "centralGravity": 0,
+                        "springLength": 3000,
+                        "springConstant": 0.02,
+                        "damping": 0.05,
+                        "avoidOverlap": 0.12
+                    },
+                    "maxVelocity": 58,
+                    "minVelocity": 0.35,
+                    "timestep": 0.89
+                },
+                nodes: {
+                    shape: 'dot',
+                    color: 'rgba(50, 50, 50, 1)',
+                    scaling:{
+                        label: {
+                            min:8,
+                            max:20
+                        }
+                    }
+                },
+                layout: {
+                    randomSeed: 20,
+                    improvedLayout: true
+                },
+                physics: true,
+                interaction: {
+                    tooltipDelay: 200,
+                    hideEdgesOnDrag: false
+                },
+                groups: {
+                    root: {color: {background: 'black'}},
+                    gss: {color: {background: 'grey'}},
+                    start_time: {color: {background: 'red'}},
+                    end_time: {color: {background: 'red'}},
+                    activity: {color: {background: 'pink'}},
+                    place: {color: {background: 'blue'}},//node 도 합치기
+                    address: {color: {background: 'blue'}},//node 도 합치기
+                    location: {color: {background: 'blue'}},//node 도 합치기
+                    person: {color: {background: 'green'}},
+                    food: {color: {background: 'orange'}},
+                    amount_of_food: {color: {background: 'orange'}},
+                    meal_type: {color: {background: 'orange'}},
+                    hunger: {color: {background: 'orange'}},
+                    emotion: {color: {background: 'yellow'}},
+                    tiredness: {color: {background: 'purple'}},
+                    temperature: {color: {background: '#136484'}},
+                    humidity: {color: {background: '#cdd4c5'}}
+                },
+            };
+
+            var data = {nodes: nodes, edges: edges};
+
+            //네트워크 구조에 데이터 추가
+            network = new vis.Network(container, data, options);
+            network.on("click", addNode);
+            network.fit();
+        }
+
+        //fuction3: 사용자 입력에 따른 데이터 로드 함수. Load 버튼 누를 시 작동.
+        function loadData() {
+            $("#date").attr("disabled", true);
+            $("#personIndex").attr("disabled", true);
+            $("#loadNode").attr("disabled", true);
+            $("#resetNode").attr("disabled", false);
+            $("#searchNode").attr("disabled", false);
+
+            var range = $("#date").val();
+            var start_date = new Date(range.split(' ')[0]);
+            var end_date = new Date(range.split(' ')[2]);
+
+            var days = (end_date - start_date) / (1000 * 60 * 60 * 24);
+            DATASET = SclabUtil.readInputFile(range.split(' ')[0], days + 1, $("#personIndex").val());
+            manager = new SNmanager(DATASET[0]);
+            manager.init();
+            DATASET.shift();
+            manager.makeSN(DATASET);
+
+            timeline.destroy();
+            draw_timeline();
+            resetAllNodes();
+			
+			avg_sleep();
+			go_sleep();
+			where_sleep();
+			go_where();
+			sleep_insideout();
+			take_shower();
+			part_job();
+			take_traffic();
+			take_class();
+			traffic_time();
+			like_food();
+			go_cafe();
+			do_dance();
+			cook_athome();
+			eat_speed();
+            howmanypttime();
+            cure();
+            paint_insideout();
+            eatalone();
+            eating_time();
+            eatsnack();
+            eatlatenight();
+            wakeup_insideout();
+            howmanyculturaltime();
+            walking_time();
+        }
+
+        //fuction4: 서치 결과 리턴. Go버튼 누를 시 작동.
+        function loadSearchResult() {
+            //pattern search 결과
+            let searchResult = manager.searchNode($("#gss").val(), $("#date-hour").val(), $("#attribute").val())
+                .map(([startsAt, endsAt, value]) => `${startsAt} ~ ${endsAt} : ${value}`)
+                .join("<br>");
+
+            $("#searchResult").html(searchResult);
+        }
+
+        //fuction5: 모든 노드, 엣지 초기화 (시각적으로 루트노드만 보여짐). reset 버튼 누를 시 작동.
+        function resetAllNodes() {
+            if (network != null) {
+                network.destroy();
+            }
+            var keyword = null;
+            try {
+                var keywordValue = document.getElementById('keyword').value;
+                keyword = keywordValue.split(',');
+                if (keyword[0] == "") {
+                    keyword = null;
+                }
+            } catch (err) {
+                keyword = ['Root'];
+            }
+
+            var tempNode = [];
+            var tempEdge = [];
+
+            tempNode.push({
+                id: (manager.root.attribute + manager.root.value),
+                group: 'root',
+                label: manager.root.value,
+                value: manager.root.weight,
+                title: 'Please Click'
+            });
+            nodes = new vis.DataSet(tempNode);
+            edges = new vis.DataSet(tempEdge);
+            draw_network();
+            manager.root.displayed = true
+
+            $("#addAll").attr("disabled", false);
+            $("#addActivity").attr("disabled", false);
+            $("#addFood").attr("disabled", false);
+            $("#addSleep").attr("disabled", false);
+            $("#makeSubGraph").attr("disabled", false);
+        }
+
+        function addNode(params) {
+            // 클릭된 노드 정보 없을 경우 중단
+            if (params["nodes"].length === 0) {
+                return;
+            }
+            // 클릭된 노드의 정보 불러오기
+            var self_id = params['nodes'][0];
+            const self = manager.getNodeById((self_id));
+            // 클릭된 노드가 자식 노드를 가지고 있지 않은 경우 중단
+            if (self.children_list.length === 0) {
+                return;
+            }
+            // 클릭된 횟수 정보가 없는 경우 초기화
+            if (self.open_count === undefined) {
+                self.open_count = 0;
+            }
+            // 자식 노드들에서 중복된 ID가 발생하지 않도록 전처리
+            self.children_list.forEach((child_a, index_a, array) => {
+                if (child_a.id === undefined) {
+                    let index = 0;
+
+                    for (let index_b = 0; index_b < index_a; index_b++) {
+                        const child_b = array[index_b];
+
+                        if ((child_a.attribute === child_b.attribute && child_a.value === child_b.value)) {
+                            index++;
+                        }
+                    }
+                    child_a.id = `${child_a.attribute}${child_a.value}`;
+                }
+            });
+            self.children_list.forEach((child) => {
+                child.weight = edgesConnected(child);
+            });
+            // 표시할 노드/엣지 정보를 읽어오고
+            // 이미 표시된 노드들을 제거
+            tempNodes = [];
+            tempEdges = [];
+            self.children_list.forEach((child) => {
+                remove_child_node(self, child);
+                if (child.attribute == 'gss') {
+                    child.weight = 10;
+                    tempNodes.push({
+                        id: child.id,
+                        label: child.value,
+                        group: child.attribute,
+                        value: child.weight,
+                        title: 'Click to See or Show next'
+                    });
+                    //title로 노드와 엣지 알려주기
+                    tempEdges.push({
+                        id: self_id + child.id,
+                        from: self_id,
+                        to: child.id,
+                        color: 'grey'
+                    });
+                }
+                else if (child.attribute == 'start_time') {
+                    tempNodes.push({
+                        id: child.id,
+                        label: child.value,
+                        group: child.attribute,
+                        value: child.weight * 2 + 5,
+                        title: 'Click to see other attributes'
+                    });//title로 노드와 엣지 알려주기
+                    tempEdges.push({
+                        id: self_id + child.id,
+                        from: self_id,
+                        to: child.id,
+                        color: 'grey'
+                    });
+                }
+                // if (child.attribute != 'end_time')
+                else if (child.attribute != 'end_time') {
+                    tempNodes.push({
+                        //최대크기 한정
+                        id: child.id,
+                        label: child.value,
+                        group: child.attribute,
+                        value: child.weight * 5 + 5,
+                        title: 'parents are:' + (child.weight + 1) + ', attribute is \'' + child.attribute + '\''
+                    });//title로 노드와 엣지 알려주기
+                    tempEdges.push({
+                        id: self_id + child.id,
+                        from: self_id,
+                        to: child.id,
+                        color: 'grey'
+                    });
+                }
+                // else if (child.attribute == 'end_time') {
+                //     tempNodes.push({
+                //         //최대크기 한정
+                //         id: 'start_time' + child.value,
+                //         label: child.value,
+                //         group: child = 'start_time',
+                //         value: child.weight * 2 + 5,
+                //         title: 'Click to see other attributes'
+                //     });//title로 노드와 엣지 알려주기
+                //     tempEdges.push({
+                //         id: self_id + 'start_time' + child.value,
+                //         from: self_id,
+                //         to: 'start_time' + child.value,
+                //         color: 'red'
+                //     });
+                // }
+            });
+            // 읽어온 노드/엣지 정보 중에서 클릭 횟수에 따른 20개만 추리기`
+            if (tempNodes.length > self.open_count * 20) {
+                tempNodes = tempNodes.slice(self.open_count * 20, self.open_count * 20 + 20);
+                tempEdges = tempEdges.slice(self.open_count * 20, self.open_count * 20 + 20);
+                self.open_count++;
+            } else {
+                tempNodes = tempNodes.slice(0, 20);
+                tempEdges = tempEdges.slice(0, 20);
+                self.open_count = 1;
+            }
+            // 화면에 표시
+            nodes.add(tempNodes);
+            edges.add(tempEdges);
+        }
+
+        //fuction9: 반복 클릭에 의해 제거되지 않던 child node 재귀적으로 제거
+        function remove_child_node(parent_node, child_node) {
+            for (const node of child_node.children_list) {
+                remove_child_node(child_node, node);
+            }
+            nodes.remove(child_node.id);
+            edges.remove((parent_node.id + child_node.id));
+        }
+
+
+        //function10: 연결된 부모 노드 개수 구함
+        function edgesConnected(node) {
+            var lines = 0;
+            edges.forEach((edge) => {
+                if (edge.to == node.id && node.parents_list[0].attribute == 'start_time') {
+                    lines++;
+                }
+            });
+            return lines;
+        }
+
+        //function11: 동일한 부모를 가진 노드 개수만큼 엣지 그어줌 subgraph 그리는 데 이용
+        function realEdge(node) {
+            nodes.forEach((realNode, weight) => {
+                if (realNode.group != 'gss' && realNode.group != 'start_time' && realNode.group != 'root') {
+                    weight = 0;
+                    edges.forEach((edge) => {
+                        if (edge.to == node.id && nodes.get(edge.from).group == 'start_time') {
+                            edges.forEach((nodeEdge) => {
+                                if (realNode.id == nodeEdge.to && edge.from == nodeEdge.from && nodes.get(nodeEdge.from).group == 'start_time') {
+                                    weight++;
+                                }
+                            });
+                        }
+                    });
+                    //todo: 중요!!!! if 문 안
+                    //현재 subgraph 표현되는 edge조건은 2이상 weight 이고 node들 weight와 관련정도 상황따라 조절가능
+                    if (weight > 2 && 1 < 2 * weight / (manager.getNodeById(node.id).weight + manager.getNodeById(realNode.id).weight + 4)) {
+                        edges.update({
+                            id: node.id + realNode.id,
+                            from: node.id,
+                            to: realNode.id,
+                            color: 'grey',
+                            value: weight * 0.1,
+                            title: 'weight is' + (weight - 1),
+                            group: 'sub'
+                        });
+                        edges.remove(node.id + node.id);
+                        edges.remove(realNode.id + node.id);
+                    }
+                }
+                //최대굵기 한정
+            });
+        }
+        //function15: index만 입력하게 하기
+
+        //function16 열려있는 start time node 전부 연결 버튼
+function makeSubGraph() {
+            //subgraph edge 형성
+            nodes.forEach((child) => {
+                child = manager.getNodeById(child.id);
+                if (child.id === undefined) {
+                    child.id = `${child.attribute}${child.value}`;
+                }
+                realEdge(child);
+            });
+            //본 그래프 노드 앳지 지우기
+            edges.forEach((edge) => {
+                if (edge.group != 'sub') {
+                    edges.remove(edge.id);
+                }
+            });
+            var exist;
+            nodes.map((node) => {
+                exist = false;
+                edges.map((edge) => {
+                    if (node.id == edge.from || node.id == edge.to ) {
+                        exist = true;
+                        return false;
+                    }
+                });
+                if(!exist){
+                    nodes.remove(node.id);
+                }
+            });
+            //나머지 버튼 disable
+            $("#addAll").attr("disabled", true);
+            $("#addActivity").attr("disabled", true);
+            $("#addFood").attr("disabled", true);
+            $("#addSleep").attr("disabled", true);
+            $("#makeSubGraph").attr("disabled", true);
+            //출력
+            var line = '';
+            line = line + 'weight: number of same parent<br>nodes<br>';
+            nodes.map((node) => {
+                line =  line + node.id + '\'s node parent' + ((node.value - 5) / 5 + 1) + '<br>';
+            });
+            line = line + 'edges' + '<br>';
+            edges.map((edge) => {
+                line = line + 'weight between' + edge.from + 'and' + edge.to + 'is' + (edge.value * 10 + 1) + '<br>';
+            });
+            $("#print").html(line);
+        }
+
+        function addAll() {
+            nodes.forEach((node) => {
+                if (node.group == 'start_time') {
+                    addByFunction(node.id)
+                }
+            });
+        }
+
+        function addSleep() {
+            nodes.forEach((node) => {
+                if (node.group == 'start_time' && manager.getNodeById(node.id).parents_list[0].value == 'sleep') {
+                    addByFunction(node.id)
+                }
+            });
+        }
+
+        function addActivity() {
+            nodes.forEach((node) => {
+                if (node.group == 'start_time'&& manager.getNodeById(node.id).parents_list[0].value == 'activity') {
+                    addByFunction(node.id)
+                }
+            });
+        }
+
+        function addFood() {
+            nodes.forEach((node) => {
+                if (node.group == 'start_time' && manager.getNodeById(node.id).parents_list[0].value == 'food') {
+                    addByFunction(node.id)
+                }
+            });
+        }
+
+
+        //time complex 효율적 추가 function
+function addByFunction(id) {
+            const self = manager.getNodeById(id);
+            // 클릭된 노드가 자식 노드를 가지고 있지 않은 경우 중단
+            if (self.children_list.length === 0) {
+                return;
+            }
+            // 클릭된 횟수 정보가 없는 경우 초기화
+            if (self.open_count === undefined) {
+                self.open_count = 0;
+            }
+
+            var tmpChildList = [];
+            // 읽어온 노드/엣지 정보 중에서 클릭 횟수에 따른 20개만 추리기`
+            if (self.open_count > 0) {
+                tmpChildList = self.children_list.slice(self.open_count * 20, self.open_count * 20 + 20);
+                self.open_count++;
+            } else {
+                tmpChildList = self.children_list.slice(0, 20);
+                self.open_count = 1;
+            }
+
+            tmpChildList.forEach((child_a) => {
+                if (child_a.id === undefined) {
+                    child_a.id = `${child_a.attribute}${child_a.value}`;
+                }
+            });
+            tmpChildList.forEach((child) => {
+                child.weight = edgesConnected(child);
+            });
+            // 표시할 노드/엣지 정보를 읽어오고
+            // 이미 표시된 노드들을 제거
+            tempNodes = [];
+            tempEdges = [];
+
+            tmpChildList.forEach((child) => {
+                remove_child_node(self, child);
+                if (child.attribute != 'end_time') {
+                    tempNodes.push({
+                        //최대크기 한정
+                        id: child.id,
+                        label: child.value,
+                        group: child.attribute,
+                        value: child.weight * 5 + 5,
+                        title: 'parents are:' + (child.weight + 1) + ', attribute is \'' + child.attribute + '\''
+                    });//title로 노드와 엣지 알려주기
+                    tempEdges.push({
+                        id: self.attribute + self.value + child.id,
+                        from: self.attribute + self.value,
+                        to: child.id,
+                        color: 'grey'
+                    });
+                }
+            });
+
+            // 화면에 표시
+            nodes.add(tempNodes);
+            edges.add(tempEdges);
+        }
+
+        //todo: 색깔설명하주는 ux
+        //todo: 최대굵기 한정
+		//pattern inform: 먹는 양
+		function eat_speed(){
+			var slp = manager.root.children_list[0];
+			var amount1=0;//많이 먹으면 amount1 카운트 +1
+			var amount2=0;//적게 먹으면 amount1 카운트 +1
+			for(var i=0; i<slp.children_list.length;i++){
+				//food 노드중에서 amount_of_food 값 가져오기
+				var eating = slp.children_list[i].children_list[7].value;
+				if(eating=="많음"){
+					//amount_of_food 값이 "많음" 이면 amount1 +1
+					amount1+=1;
+				}else{
+					//amount_of_food 값이 "보통","적음" 이면 amount2 +1
+					amount2+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(amount1>=amount2){
+				document.getElementById("patterninform19").innerHTML = '식사 시 많이 먹는 편.';
+			}else{
+				document.getElementById("patterninform19").innerHTML = '식사 시 적게 먹는 편.';
+			}
+		}
+		//pattern inform: 집에서 요리 유무
+		function cook_athome(){
+			var slp = manager.root.children_list[0];
+			var cooking=0; //집에서 요리 수
+			for(var i=0; i<slp.children_list.length;i++){
+				//food 노드중에서 place값 가져오기
+				var cook = slp.children_list[i].children_list[2].value;
+				//place값중 "집|부엌" 시 카운터 하나 올라감
+				if(cook == "집|부엌"){
+					cooking+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(cooking >=5){
+				document.getElementById("patterninform18").innerHTML = '대부분 식사는 집에서 만들어 먹는다.';
+			}else{
+				document.getElementById("patterninform18").innerHTML = '대부분 식사는 밖에서 먹는다.';
+			}
+		}
+		//pattern inform: 인천과 서울사이
+		function go_where(){
+			//sleep 노드 가져오기
+			var slp = manager.root.children_list[1];
+			//sleep 노드 마지막 길이
+			var slp_ind = slp.children_list.length-1;
+			var inseoul=0;
+			for(var i=0; i<slp.children_list.length;i++){
+				//sleep노드 중에 location이 서울이면 카운터 +1
+				var slp_location = slp.children_list[i].children_list[3].value;
+				if(slp_location.includes("서울시")){
+					inseoul +=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			//한번이라도 서울을 간다 안간다 판별
+			if(inseoul>=1){
+				document.getElementById("patterninform6").innerHTML = '검색기간 동안에 '+inseoul+'번 이상 서울간다.';
+			}else{
+				document.getElementById("patterninform6").innerHTML = '인천에서 벗어나지 않는다. 항상 인천에만 있는다.';
+			}
+		}
+		//pattern inform: 취침 하는 곳, 누구와 자는가?
+		function where_sleep(){
+			//sleep 노드 가져오기
+			var slp = manager.root.children_list[1];
+			var slp_ind = slp.children_list.length-1;
+			// outside=집 외, inside=집
+			var outside=0;
+			var inside=0;
+			var elseside=0;
+			var person=0;
+			for(var i=0; i<slp.children_list.length;i++){
+				//place값 가져오기
+				var slp_place = slp.children_list[i].children_list[2].value;
+				//person값 가져오기
+				var slp_person = slp.children_list[i].children_list[5].value;
+				if(slp_place == '집'){
+					//집에서 자면 +1
+					inside += 1;
+				}else{
+					//집 외에서 자면 +1
+					outside += 1;
+				}
+				if(slp_person == "친밀한 관계"){
+					//친밀한 사람과 자면 +1
+					person += 1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(outside>=2){
+				document.getElementById("patterninform4").innerHTML = '검색기간 동안에'+outside+'번 외박한다.';
+			}else{
+				document.getElementById("patterninform4").innerHTML = '집 외에서는 안잔다.';
+			}
+			//patterninform에다 규칙 출력
+			if(person>=1){
+				document.getElementById("patterninform5").innerHTML = '검색기간 동안에 '+person+'번 친밀한 관계와 잔다.';
+			}else{
+				document.getElementById("patterninform5").innerHTML = '항상 혼자 잔다.';
+			}
+			
+		}
+		//pattern inform: 춤 동아리를 하는가?
+		function do_dance(){
+			//activity 노드
+			var slp = manager.root.children_list[2];
+			var dodance=0;
+			for(var i=0; i<slp.children_list.length;i++){
+				//activity중에서 춤이라는 글자가 들어가면 카운트+1
+				var dancing = slp.children_list[i].children_list[1].value;
+				if(dancing.includes("춤")){
+					dodance+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(dodance>=3){
+				document.getElementById("patterninform17").innerHTML = "춤 동아리 활동 하고있다.";
+			}else{
+				document.getElementById("patterninform17").innerHTML = "춤을 싫어한다.";
+			}
+		}
+		//pattern inform: 카페를 자주 가는가?
+		function go_cafe(){
+			//activity 노드
+			var slp = manager.root.children_list[2];
+			var gocafe=0;
+			for(var i=0; i<slp.children_list.length;i++){
+				//place 중에서 "카페"글자 들어가면 카운트 +1
+				var place = slp.children_list[i].children_list[2].value;
+				if(place.includes("카페")){
+					gocafe+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(gocafe>=2){
+				document.getElementById("patterninform16").innerHTML = "평균 1주일에 1번 이상 카페에 간다.";
+			}else{
+				document.getElementById("patterninform16").innerHTML = "카페를 잘 안 간다.";
+			}
+		}
+		//pattern inform: 잠드는 시간의 평균
+		function go_sleep(){
+			var total_time1=0;//취침시 시간의 총합
+			var total_time2=0;//기상시 시간의 총합
+			var avg_gosleep_hr=0;//평균 취침시 시간
+			var avg_gosleep_min=0;//평균 취침시 시간
+			var avg_wake_hr=0;//평균 기상시 시간
+			var avg_wake_min=0;//평균 기상시 시간
+			var slp = manager.root.children_list[1];
+			var slp_ind = slp.children_list.length-1;
+			for(var i=0; i<slp.children_list.length;i++){
+				//start_time 값
+				var stt1=slp.children_list[i].value;
+				//end_time 값
+				var stt2=slp.children_list[i].getChildByAttr('end_time').value;
+				
+				//split으로 date 형식이었던 값을 분리 (hh:mm 필요)
+				var str1 = stt1.split('-');
+				var str2 = str1[2].split(' ');
+				var str3 = str2[1].split(':');
+				var str4 = stt2.split('-');
+				var str5 = str4[2].split(' ');
+				var str6 = str5[1].split(':');
+				var num1=parseInt(str3[0]);
+				var num2=parseInt(str3[1]);
+				var num3=parseInt(str6[0]);
+				var num4=parseInt(str6[1]);
+				var min1;
+				var min2;
+				if(num1 > 18){num1 = num1 - 24;} //자정 전에 잔다면 24빼주기
+				//분 단위로 변환
+				min1=(num1*60)+num2;
+				min2=(num3*60)+num4;
+				//분의 총합
+				total_time1 = total_time1 + min1;
+				total_time2 = total_time2 + min2;
+			}
+			//평균 구하기
+			avg_gosleep_hr = total_time1/slp_ind/60;
+			avg_gosleep_min = parseInt((avg_gosleep_hr-parseInt(avg_gosleep_hr))*60);
+			avg_wake_hr = total_time2/slp_ind/60;
+			avg_wake_min = parseInt((avg_wake_hr-parseInt(avg_wake_hr))*60);
+			//patterninform에다 규칙 출력
+			document.getElementById("patterninform2").innerHTML = ('평균 잠드는 시간 '+parseInt(avg_gosleep_hr)+':'+avg_gosleep_min+'이다.');
+			//patterninform에다 규칙 출력
+			document.getElementById("patterninform3").innerHTML = ('평균 기상하는 '+parseInt(avg_wake_hr)+':'+avg_wake_min+'이다.');
+		}
+		//pattern inform: 알바를 하는가
+		function part_job(){
+			//activity노드
+			var slp = manager.root.children_list[2];
+			var slp_ind = slp.children_list.length-1;
+			var num_work=0;
+			for(var i=0; i < slp.children_list.length; i++) {
+				//activity 노드에서 activity값 가져오기
+				var working = slp.children_list[i].getChildByAttr('activity').value;
+				if(working == "기타|아르바이트"){
+					//아르바이트라는 단어가 있을 시 카운트 +1
+					num_work+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(num_work>=1){
+				document.getElementById("patterninform9").innerHTML = "아르바이트를 한다.";
+			}else{
+				document.getElementById("patterninform9").innerHTML = "아르바이트를 안한다.";
+			}
+			
+		}
+		//pattern inform: 수업을 받는가? 학생인가 아닌가?
+		function take_class(){
+			//activity 노드
+			var slp = manager.root.children_list[2];
+			var slp_ind = slp.children_list.length-1;
+			var num_place=0;
+			for(var i=0; i < slp.children_list.length; i++) {
+				//activity중에서 place값 가져오기
+				var study = slp.children_list[i].getChildByAttr('place').value;
+				//학교라는 단어와 공부가 들어가면 카운트 +1
+				if(study.includes("학교")){
+					num_place+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(num_place>=1){
+				document.getElementById("patterninform11").innerHTML = "이 사람은 학생이고 재학중이다.";
+			}else{
+				document.getElementById("patterninform11").innerHTML = "이 사람은 학생이 아니거나 휴학중이다.";
+			}
+			
+		}
+		//pattern inform: what kind of food do you like
+		function like_food(){
+			var slp = manager.root.children_list[0];
+			var korea_food=0;//한식
+			var japan_food=0;//일식
+			var china_food=0;//중식
+			var western_food=0;//양식
+			var other_food=0;//기타
+			var max_food=0;//가져 횟수가 많은 값 찾기
+			var num_coffee=0;//커피 마시는 횟수
+			var drinking=0;//술 마시는 횟수
+			for(var i=0; i < slp.children_list.length; i++) {
+				//food값 가져오기
+				var eating = slp.children_list[i].children_list[6].value;
+				//condition of 종류
+				if(eating.includes("한식")){
+					korea_food+=1;
+				}else if(eating.includes("중식")){
+					china_food+=1;
+				}else if(eating.includes("일식")){
+					japan_food+=1;
+				}else if(eating.includes("양식")){
+					western_food+=1;
+				}else if(eating.includes("기타")){
+					other_food+=1;
+				}
+				//condition of 커피와 술
+				if(eating ==("기타|커피")){
+					num_coffee+=1;
+				}else if(eating == "기타|술"){
+					drinking+=1;
+				}
+			}
+			// 최대값을 구하고 최대값하고 같은 경우 출력
+			//patterninform에다 규칙 출력
+			max_food = Math.max(korea_food, china_food, japan_food, western_food);
+			if(max_food == korea_food){
+				document.getElementById("patterninform14").innerHTML = "한식을 좋아한다.";
+			}else if(max_food == china_food){
+				document.getElementById("patterninform14").innerHTML = "중식을 좋아한다.";
+			}else if(max_food == japan_food){
+				document.getElementById("patterninform14").innerHTML = "일식을 좋아한다.";
+			}else if(max_food == western_food){
+				document.getElementById("patterninform14").innerHTML = "양식을 좋아한다.";
+			}
+			//patterninform에다 규칙 출력
+			if(drinking>=5){
+				document.getElementById("patterninform13").innerHTML = "평소에 술을 좋아한다."; 
+			}else{
+				document.getElementById("patterninform13").innerHTML = "평소에 술을 먹지 않는다."; 
+			}
+			//patterninform에다 규칙 출력
+			if(num_coffee>=3){
+				document.getElementById("patterninform15").innerHTML = "커피를 자주 마신다.";
+			}else{
+				document.getElementById("patterninform15").innerHTML = "커피를 자주 안 마신다.";
+			}
+		}
+		//pattern inform: 교통 이용 시간
+		function traffic_time(){
+			var slp = manager.root.children_list[2];
+			var day = manager.root.children_list[1];
+			var slp_ind = day.children_list.length-1;
+
+			var total_time=0; //토탈 시간
+			var avg_hr=0; //평균 시간
+			for(var i=0; i < slp.children_list.length; i++) {
+				// place값 가져오기
+				var taking = slp.children_list[i].getChildByAttr('place').value;
+				//대중교통 단어 들어가면 if문 발동
+				if(taking.includes("대중교통")){
+					//start_time과 end_time stt1,stt2에 저장
+					var trf_stt1=slp.children_list[i].value;
+					var trf_stt2=slp.children_list[i].getChildByAttr('end_time').value;
+					//split으로 date형식을 string형식으로 분리
+					var trf_str1 = trf_stt1.split('-');
+					var trf_str2 = trf_str1[2].split(' ');
+					var trf_str3 = trf_str2[1].split(':');
+					
+					var trf_str4 = trf_stt2.split('-');
+					var trf_str5 = trf_str4[2].split(' ');
+					var trf_str6 = trf_str5[1].split(':');
+					var trf_num1=parseInt(trf_str3[0]);
+					var trf_num2=parseInt(trf_str3[1]);
+					var trf_num3=parseInt(trf_str6[0]);
+					var trf_num4=parseInt(trf_str6[1]);
+					var trf_min1;
+					var trf_min2;
+					var trf_dif;
+					if(trf_num1>trf_num3){
+						trf_num3=24;
+					}
+					//시간 계산
+					trf_min1=(trf_num1*60)+trf_num2;
+					trf_min2=(trf_num3*60)+trf_num4;
+					
+					trf_dif = trf_min2-trf_min1;
+					total_time = total_time + trf_dif;
+				}
+			}
+			//평균 시간 구하기
+			avg_hr = total_time/slp_ind/60;
+			//patterninform에다 규칙 출력
+			document.getElementById("patterninform12").innerHTML = ('평균 대중교통을 '+avg_hr.toFixed(2)+'시간을 이용한다.'); 
+		}
+		//pattern inform: 어떤 대중교통 선호
+		function take_traffic(){
+			//activity노드
+			var slp = manager.root.children_list[2];
+			var num_sub=0;//전철 카운트
+			var num_bus=0;//버스 카운트
+			for(var i=0; i < slp.children_list.length; i++) {
+				//place값 가져오기
+				var taking = slp.children_list[i].getChildByAttr('place').value;
+				//버스를 탈때마다 버스값 +1, 지하철을 탈때마다 지하철값 +1
+				if(taking == "대중교통|버스"){
+					num_bus+=1;
+				}else if(taking == "대중교통|지하철"){
+					num_sub+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(num_bus>=num_sub){
+				document.getElementById("patterninform10").innerHTML = "지하철보다는 버스를 애용한다.";
+			}else{
+				document.getElementById("patterninform10").innerHTML = "버스보다는 지하철를 애용한다.";
+			}
+			
+		}
+		//pattern inform: 평균 샤워
+		function take_shower(){
+			//activity와 sleep노드 가져오기
+			var slp = manager.root.children_list[2];
+			var day = manager.root.children_list[1];
+			var slp_ind = slp.children_list.length-1;
+			var day_ind = day.children_list.length-1;
+			var num_sho=0;
+            for(var i=0; i < slp.children_list.length; i++) {
+				//activity child노드 값 가져오기
+				var shower = slp.children_list[i].getChildByAttr('activity').value;
+				//샤워할 때마다 카운트 +1
+				if(shower == "기타|샤워"){
+					num_sho+=1;
+				}
+			}
+			//patterninform에다 규칙 출력
+			if(num_sho>day_ind){
+				document.getElementById("patterninform8").innerHTML = "하루에 보통 2번을 샤워한다.";
+			}else{
+				document.getElementById("patterninform8").innerHTML = "하루에 한번 샤워를 한다.";
+			}
+			
+		}
+		//pattern inform: 수면중에 너의 emotion
+		function sleep_insideout(){
+			//sleep노드 가져오기
+            var slp = manager.root.children_list[1];
+            var happy = 0;
+			var slp_ind = slp.children_list.length-1;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var happytime = slp.children_list[i].getChildByAttr('emotion').value;
+                if (happytime == "긍정") {
+                    happy = happy + 1;
+                } else if (happytime == "매우 긍정") {
+                    happy = happy + 2;
+                } else if (happytime == "보통"){
+                    happy = happy + 0;
+                }
+                else if (happytime == "부정"){
+                    happy = happy - 1;
+                }
+                else if (happytime == "매우 부정"){
+                    happy = happy - 2;
+                }
+            }
+			//patterninform에다 규칙 출력
+			if(happy>=0){
+				document.getElementById("patterninform7").innerHTML = '수면중 주로 행복하다.';
+			}else{
+				document.getElementById("patterninform7").innerHTML = '수면중 주로 행복하지 않는다.';
+			}
+        }
+		//pattern inform: 평균 수면 시간
+		function avg_sleep(){
+			var total_time=0;//총합 자는 시간
+			var avg_hr=0;//평균 자는 시간
+			var avg_min=0;//평균 자는 시간
+			var slp = manager.root.children_list[1];//sleep노드
+			var slp_ind = slp.children_list.length-1;
+			
+			for(var i=0; i < slp.children_list.length; i++){
+				//start_time과 end_time 값 가져오기
+				var stt1=slp.children_list[i].value;
+				var stt2=slp.children_list[i].getChildByAttr('end_time').value;
+				//split으로 date형식 to string형식 중에서 분과 시 단위 가져오기
+				var str1 = stt1.split('-');
+				var str2 = str1[2].split(' ');
+				var str3 = str2[1].split(':');
+				
+				var str4 = stt2.split('-');
+				var str5 = str4[2].split(' ');
+				var str6 = str5[1].split(':');
+				var num1=parseInt(str3[0]);
+				var num2=parseInt(str3[1]);
+				var num3=parseInt(str6[0]);
+				var num4=parseInt(str6[1]);
+				var min1;
+				var min2;
+				var dif;
+				//12 넘어가면 12를 빼준다
+				if(num1>=12){
+					num1=num1-12;
+				}
+				if(num3>=12){
+					num3=num3-12;
+				}
+				//시간 계산
+				min1=(num1*60)+num2;
+				min2=(num3*60)+num4;
+				
+				//start와 end 시간을 뺀 값
+				dif = min2-min1;
+				total_time = total_time + dif;
+			}
+			//평균 시간 구하기
+			avg_hr=total_time/(slp_ind-1)/60;
+			//patterninform에다 규칙 출력
+			if(avg_hr<6){
+				document.getElementById("patterninform0").innerHTML = ('평균 수면 시간 '+avg_hr.toFixed(2)+'이다.');
+				document.getElementById("patterninform1").innerHTML = "수면부족이다. 기상 후 피곤하다.";
+				
+			}else{
+				document.getElementById("patterninform0").innerHTML = ('평균 수면 시간 '+avg_hr.toFixed(2)+'이다.');
+				document.getElementById("patterninform1").innerHTML = "기상 후 피곤하지 않는다.";
+			}
+			
+		}
+
+        //pattern inform: 헬스는 검색 기간내에 몇번하나?
+        function howmanypttime(){
+            //활동 노드 가져오기
+            var slp = manager.root.children_list[2];
+            //활동 노드 마지막 길이
+            var slp_ind = slp.children_list.length-1;
+            var pttime=0;
+            for(var i=0; i<slp.children_list.length;i++){
+                //활동노드 중에 activity가 기타|헬스라면 카운터 +1
+                var slp_pt = slp.children_list[i].children_list[1].value;
+                if(slp_pt.includes("헬스")){
+                    pttime +=1;
+                }
+            }
+            //patterninform에다 규칙 출력
+            //헬스를 하는지 여부 판별, 한다면 기간 내 횟수 출력
+            if(pttime>=1){
+                document.getElementById("patterninform20").innerHTML = '기간 내에 '+pttime+'번 헬스한다.';
+            }else{
+                document.getElementById("patterninform20").innerHTML = '헬스를 하지 않는다';
+            }
+        }
+
+        //pattern inform: 헬스 후 1일 이내에 물리치료를 받았는가?
+        function cure(){
+            //활동 노드 가져오기
+            var slp = manager.root.children_list[2];
+            var curetime; //함수가 원하는, 헬스 후 1일 내에 물리치료를 받은 회수에 대한 카운트
+            for(var i=0; i<slp.children_list.length;i++){
+                //활동노드 중에 activity가 기타|헬스라면 날짜를 받는다
+                var slp_pt = slp.children_list[i].children_list[1].value;
+                if(slp_pt.includes("헬스")){
+                    var slp_pttime = slp.children_list[i].children_list[0].value;
+                    var str1 = slp_pttime.split('-');
+                    var str2 = str1[2].split(' ');
+                    var str3 = str2[0]; //날짜의 일
+                    var str4 = str1[1]; //날짜의 월
+                    var num1 = parseInt(str3);
+                    var num2 = parseInt(str4);
+                    for(var j=0; j<slp.children_list.length; j++){
+                        var slp_cure = slp.children_list[j].children_list[1].value;
+                        if(slp_cure.includes("물리치료")){
+                            //물리치료받은 날을 검색해 날짜를 받는다.
+                            var slp_curetime = slp.children_list[j].children_list[0].value;
+                            var str5 = slp_curetime.split('-');
+                            var str6 = str5[2].split(' ');
+                            var str7 = str6[0]; //날짜의 일
+                            var str8 = str5[1]; //날짜의 월
+                            var num3 = parseInt(str7);
+                            var num4 = parseInt(str8);
+                            if(num3 == num1+1) {curetime = curetime+1;}
+                            else if(num4 == num2+1){
+                                if(num3 ==1 && num1==31) {curetime=curetime+1;}
+                                else if(num3==1 && num1==28 && num2==2) {curetime=curetime+1;}
+                                else if(num3==1 && num1==30 && num2==4) {curetime=curetime+1;}
+                                else if(num3==1 && num1==30 && num2==6) {curetime=curetime+1;}
+                                else if(num3==1 && num1==30 && num2==9) {curetime=curetime+1;}
+                                else if(num3==1 && num1==30 && num2==11) {curetime=curetime+1;}
+                            }//헬스한 날짜와 물리치료받은날짜의 차이가 1일이어야 함
+                        }
+                    }
+                }
+            }
+            //patterninform에다 규칙 출력
+            //헬스한 날짜와 물리치료받은날짜의 차이가 1일인 사건이 존재하는지 판별
+            if(curetime>=1){
+                document.getElementById("patterninform21").innerHTML = '기간 내에 헬스한  후 1일 이내에 물리치료를 받은 적이 있다';
+            }else{
+                document.getElementById("patterninform21").innerHTML = '기간 내에 헬스한  후 1일 이내에 물리치료를 받은 적이 없다';
+            }
+        }
+
+        //pattern inform: 회화작업중에 너의 emotion
+        function paint_insideout(){
+            var slp = manager.root.children_list[2];
+            var happy = 0;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var paint = slp.children_list[i].children_list[1].value;
+                if(paint.includes("회화작업")) {
+                    var happytime = slp.children_list[i].getChildByAttr('emotion').value;
+                    if (happytime == "긍정") {
+                        happy = happy + 1;
+                    } else if (happytime == "매우 긍정") {
+                        happy = happy + 2;
+                    } else if (happytime == "보통"){
+                        happy = happy + 0;
+                    }
+                    else if (happytime == "부정"){
+                        happy = happy - 1;
+                    }
+                    else if (happytime == "매우 부정"){
+                        happy = happy - 2;
+                    }
+                }
+            }
+            //patterninform에다 규칙 출력
+            if(happy>=0){
+                document.getElementById("patterninform22").innerHTML = '회화작업중 주로 행복하다.';
+            }else{
+                document.getElementById("patterninform22").innerHTML = '회화작업중 주로 행복하지 않는다.';
+            }
+        }
+
+        //pattern inform: 뭐 먹을때 주로 혼자먹는가, 누구랑 같이 먹는가
+        function eatalone(){
+            var slp = manager.root.children_list[0];
+            var alone=0;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var eataloneornot = slp.children_list[i].children_list[5].value;
+                if(eataloneornot.includes("혼자")) {
+                    alone = alone+1;
+                }
+                else {alone = alone-1;}
+            }
+            //patterninform에다 규칙 출력
+            if(alone>0){
+                document.getElementById("patterninform23").innerHTML = '주로 혼자 먹는다.';
+            }else{
+                document.getElementById("patterninform23").innerHTML = '주로 혼자 먹지 않는다.';
+            }
+        }
+
+        //pattern inform: 식사에 걸리는 시간
+        function eating_time(){
+            var slp = manager.root.children_list[0];
+			var ind = slp.children_list.length-1;
+            var total_time=0; //토탈 시간
+            for(var i=0; i < slp.children_list.length; i++){
+                var trf_stt1=slp.children_list[i].value;
+                var trf_stt2=slp.children_list[i].getChildByAttr('end_time').value;
+                    //split으로 date형식을 string형식으로 분리
+                    var trf_str1 = trf_stt1.split('-');
+                    var trf_str2 = trf_str1[2].split(' ');
+                    var trf_str3 = trf_str2[1].split(':');
+
+                    var trf_str4 = trf_stt2.split('-');
+                    var trf_str5 = trf_str4[2].split(' ');
+                    var trf_str6 = trf_str5[1].split(':');
+                    var trf_num1=parseInt(trf_str3[0]);
+                    var trf_num2=parseInt(trf_str3[1]);
+                    var trf_num3=parseInt(trf_str6[0]);
+                    var trf_num4=parseInt(trf_str6[1]);
+                    var trf_min1;
+                    var trf_min2;
+                    var trf_dif;
+                    if(trf_num1>trf_num3){
+                        trf_num3=24;
+                    }
+                    //시간 계산
+                    trf_min1=(trf_num1*60)+trf_num2;
+                    trf_min2=(trf_num3*60)+trf_num4;
+
+                    trf_dif = trf_min2-trf_min1;
+                    total_time = total_time + trf_dif;
+                }
+            //평균 시간 구하기
+            var avg_hr = total_time/60/ind;
+            //patterninform에다 규칙 출력
+            document.getElementById("patterninform24").innerHTML = '무언가 먹는데 걸리는 시간은 평균 '+avg_hr.toFixed(2)+'시간이다.';
+            }
+
+        //pattern inform: 검색기간동안 간식먹은 횟수
+        function eatsnack(){
+            var slp = manager.root.children_list[0];
+            var snack=0;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var snacktime = slp.children_list[i].children_list[8].value;
+                if(snacktime.includes("간식")) {
+                    snack = snack+1;
+                }
+            }
+            //patterninform에다 간식먹은 횟수출력
+            document.getElementById("patterninform25").innerHTML = '검색기간 동안 간식을 '+snack+'번 먹었다.';
+            }
+
+        //pattern inform: 검색기간동안 야식먹은 횟수
+        function eatlatenight(){
+            var slp = manager.root.children_list[0];
+            var snack=0;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var snacktime = slp.children_list[i].children_list[8].value;
+                if(snacktime.includes("야식")) {
+                    snack = snack+1;
+                }
+            }
+            //patterninform에다 야식먹은 횟수출력
+            document.getElementById("patterninform26").innerHTML = '검색기간 동안 야식을 '+snack+'번 먹었다.';
+        }
+
+        //pattern inform: 잠자고 일어났을 때 너의 emotion
+        function wakeup_insideout(){
+            var slp = manager.root.children_list[2];
+            var happy = 0;
+            for(var i=0; i < slp.children_list.length; i++) {
+                var wake = slp.children_list[i].children_list[1].value;
+                if(wake.includes("기상")) {
+                    var happytime = slp.children_list[i].getChildByAttr('emotion').value;
+                    if (happytime == "긍정") {
+                        happy = happy + 1;
+                    } else if (happytime == "매우 긍정") {
+                        happy = happy + 2;
+                    } else if (happytime == "보통"){
+                        happy = happy + 0;
+                    }
+                    else if (happytime == "부정"){
+                        happy = happy - 1;
+                    }
+                    else if (happytime == "매우 부정"){
+                        happy = happy - 2;
+                    }
+                }
+            }
+            //patterninform에다 규칙 출력
+            if(happy>=0){
+                document.getElementById("patterninform27").innerHTML = '일어났을 때 주로 행복하다.';
+            }else{
+                document.getElementById("patterninform27").innerHTML = '일어났을 때 주로 행복하지 않는다.';
+            }
+        }
+
+        //pattern inform: 문화생활은 몇 번 하나?
+        function howmanyculturaltime(){
+            //활동 노드 가져오기
+            var slp = manager.root.children_list[2];
+            var culturaltime=0;
+            for(var i=0; i<slp.children_list.length;i++){
+                //활동노드 중에 activity가 문화생활이라면 카운터 +1
+                var slp_cl = slp.children_list[i].children_list[1].value;
+                if(slp_cl.includes("독서회")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("음악회")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("전시회")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("미팅")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("노래")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("구경")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("산책")){
+                    culturaltime = culturaltime + 1;
+                }
+                else if(slp_cl.includes("영화관람")){
+                    culturaltime = culturaltime + 1;
+                }
+            }
+            //patterninform에다 규칙 출력
+            if(culturaltime>=1){
+                document.getElementById("patterninform28").innerHTML = '기간 내에 '+culturaltime+'번 문화 및 여가 활동을 한다.';
+            }else{
+                document.getElementById("patterninform28").innerHTML = '문화 및 여가활동을 하지 않는다.';
+            }
+        }
+        //pattern inform: 걷는 데 들이는 시간
+        function walking_time(){
+            var slp = manager.root.children_list[2];
+            var day = manager.root.children_list[1];
+            var slp_ind = day.children_list.length-1;
+
+            var total_time=0; //토탈 시간
+            var avg_hr=0; //평균 시간
+            for(var i=0; i < slp.children_list.length; i++) {
+                // place값 가져오기
+                var taking = slp.children_list[i].getChildByAttr('place').value;
+                //도보 단어 들어가면 if문 발동
+                if(taking.includes("도보")){
+                    //start_time과 end_time stt1,stt2에 저장
+                    var trf_stt1=slp.children_list[i].value;
+                    var trf_stt2=slp.children_list[i].getChildByAttr('end_time').value;
+                    //split으로 date형식을 string형식으로 분리
+                    var trf_str1 = trf_stt1.split('-');
+                    var trf_str2 = trf_str1[2].split(' ');
+                    var trf_str3 = trf_str2[1].split(':');
+
+                    var trf_str4 = trf_stt2.split('-');
+                    var trf_str5 = trf_str4[2].split(' ');
+                    var trf_str6 = trf_str5[1].split(':');
+                    var trf_num1=parseInt(trf_str3[0]);
+                    var trf_num2=parseInt(trf_str3[1]);
+                    var trf_num3=parseInt(trf_str6[0]);
+                    var trf_num4=parseInt(trf_str6[1]);
+                    var trf_min1;
+                    var trf_min2;
+                    var trf_dif;
+                    if(trf_num1>trf_num3){
+                        trf_num3=24;
+                    }
+                    //시간 계산
+                    trf_min1=(trf_num1*60)+trf_num2;
+                    trf_min2=(trf_num3*60)+trf_num4;
+
+                    trf_dif = trf_min2-trf_min1;
+                    total_time = total_time + trf_dif;
+                }
+            }
+            //평균 시간 구하기
+            avg_hr = total_time/slp_ind/60;
+            //patterninform에다 규칙 출력
+            document.getElementById("patterninform29").innerHTML = ('평균 '+avg_hr.toFixed(2)+'시간을 걷는 데 쓴다.');
+        }
+    </script>
+</head>
+
+<body>
+<div class="wrapper">
+    <div class="viewer">
+        <div id="networkViewer"></div>
+        <div id="timeline_visualization"></div>
+    </div>
+
+    <div class="panel">
+        <h1>Keyword Input</h1>
+        <div class="group">
+            <div class="row">
+                <div class="label">Date</div>
+                <input class="fit" id="date">
+            </div>
+            <div class="row">
+                <div class="label">Person Index</div>
+                <input id="personIndex" class="fit" type="number" step="1" min="0" value="1">
+            </div>
+            <div class="row">
+                <div class="label">Data</div>
+                <button class="fit" id="loadNode" onclick="loadData();">Load</button>
+                <button class="fit" id="resetNode" onclick="resetAllNodes();" disabled>Restart</button>
+            </div>
+        </div>
+
+        <h1>Pattern Search</h1>
+        <div class="group">
+            <div class="row">
+                <input class="fit" id='gss' type="text" placeholder="gss">
+                <input class="fit" id='date-hour' type="text" placeholder="yyyy-mm-dd-hour">
+                <input class="fit" id='attribute' type="text" placeholder="attribute">
+                <button class="fit" id="searchNode" onclick="loadSearchResult();" disabled>Go</button>
+            </div>
+            <div id="searchResult" class="rows"></div>
+        </div>
+        <button class="fit" id="addAll" onclick="addAll();">Show All Start Node</button>
+        <br>
+        <button class="fit" id="addActivity" onclick="addActivity();">Show Activity Start Node </button>
+        <br>
+        <button class="fit" id="addSleep" onclick="addSleep();">Show Sleep Start Node</button>
+        <br>
+        <button class="fit" id="addFood" onclick="addFood();">Show Food Start Node</button>
+        <br>
+        <button class="fit" id="makeSubGraph" onclick="makeSubGraph();">Make Sub graph (one time)</button>
+        <br>
+
+    </div>
+    <div class="panel">
+        <h1>Pattern Information</h1>
+        <br>
+        <div class="group last" id="print">
+			<p id="patterninform0" ></p>
+			<p id="patterninform1" ></p>
+			<p id="patterninform2" ></p>
+			<p id="patterninform3" ></p>
+			<p id="patterninform4" ></p>
+			<p id="patterninform5" ></p>
+			<p id="patterninform6" ></p>
+			<p id="patterninform7" ></p>
+			<p id="patterninform8" ></p>
+			<p id="patterninform9" ></p>
+			<p id="patterninform10" ></p>
+			<p id="patterninform11" ></p>
+			<p id="patterninform12" ></p>
+			<p id="patterninform13" ></p>
+			<p id="patterninform14" ></p>
+			<p id="patterninform15" ></p>
+			<p id="patterninform16" ></p>
+			<p id="patterninform17" ></p>
+			<p id="patterninform18" ></p>
+			<p id="patterninform19" ></p>
+			<p id="patterninform20" ></p>
+			<p id="patterninform21" ></p>
+			<p id="patterninform22" ></p>
+			<p id="patterninform23" ></p>
+			<p id="patterninform24" ></p>
+			<p id="patterninform25" ></p>
+			<p id="patterninform26" ></p>
+			<p id="patterninform27" ></p>
+			<p id="patterninform28" ></p>
+			<p id="patterninform29" ></p>
+		</div>
+    </div>
+</div>
+</body>
+</html>
